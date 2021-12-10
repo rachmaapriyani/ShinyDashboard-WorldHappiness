@@ -1,0 +1,352 @@
+---
+title: "whr"
+author: "Rachma"
+date: "8/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(shiny)
+library(shinythemes)
+library(plotly)
+library(googleVis)
+library(tidyverse)
+library(DT)
+library(countrycode)
+```
+
+```{r}
+
+happiness_2020 <-  read.csv("./data/happiness_2020.csv")
+happiness_2019 <-  read.csv("./data/happiness_2019.csv")
+happiness_2018 <-  read.csv("./data/happiness_2018.csv")
+happiness_2017 <-  read.csv("./data/happiness_2017.csv")
+
+```
+
+```{r}
+country_conversion <-  read.csv("./data/country_conversion.csv")
+```
+
+
+
+```{r}
+# add column year to each dataframe
+
+happiness_2020$year <-  2020
+happiness_2019$year <-  2019
+happiness_2018$year <-  2018
+happiness_2017$year <- 2017
+```
+
+
+
+```{r}
+
+happiness_2017 <-  happiness_2017 %>%
+  rename(
+    Rank = Happiness.Rank,
+    Score = Happiness.Score, 
+    GDP.per.capita = Economy..GDP.per.Capita.,
+    Healthy.life.expectancy = Health..Life.Expectancy.,
+    Freedom.to.make.life.choices = Freedom, 
+    Perceptions.of.corruption = Trust..Government.Corruption.,
+    Social.support = Family
+  )
+
+```
+
+
+```{r}
+happiness_2018$Perceptions.of.corruption = as.numeric(happiness_2018$Perceptions.of.corruption)
+happiness_2018 <-  happiness_2018 %>%
+  rename(
+    Rank = Overall.rank,
+    Country = Country.or.region
+  )%>%
+  mutate(Dystopia.Residual <-  Score-rowSums(.[4:9], na.rm=TRUE))
+
+
+```
+
+```{r}
+happiness_2019 <-  happiness_2019 %>%
+  rename(
+    Rank = Overall.rank,
+    Country = Country.or.region
+  ) %>%
+  mutate(Dystopia.Residual = Score-rowSums(.[4:9], na.rm=TRUE))
+```
+
+```{r}
+happiness_2020 <-  happiness_2020 %>%
+  rename(
+    Country = Country.name,
+    Region = Regional.indicator,
+    Score = Ladder.score,
+    GDP.per.capita = Logged.GDP.per.capita,
+    Social.support = Social.support,
+    Healthy.life.expectancy = Healthy.life.expectancy,
+    Freedom.to.make.life.choices = Freedom.to.make.life.choices,
+    Perceptions.of.corruption = Perceptions.of.corruption,
+    Dystopia.Residual = Dystopia...residual
+  )
+```
+
+
+
+```{r}
+# remove unnecessary columns
+
+happiness_2020 <-  happiness_2020[-c(5,6,7,14,15,16,17,18,19,20)]  
+happiness_2017 <-  happiness_2017[-c(4,5)]
+
+
+```
+
+
+```{r}
+# bind rows of yearly datasets
+happiness <-  bind_rows(happiness_2017,happiness_2018,happiness_2019,happiness_2020)
+```
+
+
+
+```{r}
+# create continent and country code columns
+happiness$code <-  countrycode(happiness$Country, origin='country.name',destination='iso3c', custom_match = c(Kosovo = "KSV"))
+country_conversion <-  country_conversion %>%
+  select(code_3,continent,sub_region)
+happiness = happiness %>%
+  left_join(country_conversion,by = c('code'='code_3'))
+```
+
+
+
+```{r}
+# reorder columns in happiness dataframe
+column_order <-  c('year','sub_region','continent','Country','code','Rank','Score', 'GDP.per.capita', 'Healthy.life.expectancy' ,'Freedom.to.make.life.choices', 'Generosity', 'Perceptions.of.corruption','Social.support',"Dystopia.Residual" )
+happiness <-  happiness[,column_order]
+```
+
+
+```{r}
+# light grey boundaries
+l <- list(color = toRGB("grey"), width = 0.5)
+# specify map projection/options
+g <- list(showframe = FALSE,showcoastlines = FALSE,
+          projection = list(type = 'Mercator'))
+
+```
+
+```{r}
+# Choices used for input
+scatter_choices <-  list("Happiness Score" = 'Score',
+                       "GDP per Capita"="GDP.per.capita",
+                       "Healthy Life Expectancy"="Healthy.life.expectancy",
+                       "Freedom to Make Life Choices"="Freedom.to.make.life.choices",
+                       "Generosity"="Generosity",
+                       "Perception of Corruption" = 'Perceptions.of.corruption',
+                       'Social Support' = 'Social.support',
+                       'Dystopia residual' = 'Dystopia.Residual')
+```
+
+```{r}
+happiness %>% 
+  filter(year == 2018) %>% 
+  group_by(Country,Score)
+```
+
+
+```{r}
+happiness %>% 
+  
+  arrange(desc(Score))
+```
+```{r}
+map_happiness <-  happiness %>%
+      select(c('year','Score','Country','code',"GDP.per.capita","Social.support","Healthy.life.expectancy","Freedom.to.make.life.choices","Perceptions.of.corruption","Generosity",'Dystopia.Residual'))
+```
+
+```{r}
+map_happiness %>% 
+arrange(desc(Score))
+```
+
+
+```{r}
+glimpse(happiness)
+```
+
+```{r}
+names(select_if(happiness[-c(1,2,3,4,5,6)], is.numeric))
+```
+
+```{r}
+happiness %>% 
+  filter(year == 2020) %>% 
+  group_by(Country,Score)
+```
+```{r}
+happiness
+```
+```{r}
+happiness %>% 
+  is.na() %>% 
+  colSums()
+```
+
+
+```{r}
+happiness %>% 
+  filter(Perceptions.of.corruption==0 & year == 2018) %>% 
+  group_by(Score)
+```
+
+
+```{r}
+happiness[happiness==0] <- NA
+ happiness
+```
+```{r}
+
+happiness %>% 
+  is.na() %>% 
+  colSums()
+```
+
+```{r}
+is.na(happiness)
+```
+
+```{r}
+ggplot(data = happiness, 
+       mapping = aes(x = sub_region,
+                     y = Score)) +
+  geom_col() +
+  coord_flip()
+  
+```
+
+
+```{r}
+happiness %>% 
+  is.na() %>% 
+  colSums()
+```
+
+```{r}
+
+happiness <- happiness %>% 
+  drop_na(sub_region,continent)
+```
+
+```{r}
+happiness %>% 
+  is.na() %>% 
+  colSums()
+```
+
+
+```{r}
+ggplot(data = happiness, 
+       mapping = aes(x = sub_region,
+                     y = Score)) +
+  geom_col() +
+  coord_flip()
+```
+
+
+```{r}
+# test predict using simple lm
+happiness %>% 
+  filter(year == 2020 & Country == "Finland") %>% 
+lm(formula = Score ~ Healthy.life.expectancy)
+```
+
+```{r}
+happiness %>% 
+  filter(year == 2019 & Country == "Finland")
+```
+
+```{r}
+ map_happiness = happiness %>%
+      select(c('year','Score','Country','code',"GDP.per.capita","Healthy.life.expectancy","Freedom.to.make.life.choices","Generosity","Perceptions.of.corruption","Social.support",'Dystopia.Residual'))
+```
+
+
+```{r}
+map_happiness
+```
+
+
+
+```{r}
+map_happiness %>%
+      mutate(Score = rowSums(.[5:length(map_happiness)], na.rm=TRUE)) %>%
+      arrange(desc(Score))
+```
+
+```{r}
+happiness
+ 
+```
+
+
+```{r}
+test2 <- happiness %>%
+   distinct(sub_region,continent,Score) %>% 
+      group_by(sub_region,continent) %>%
+      summarise(Score= mean(Score)) %>% 
+      select (sub_region,continent,Score) %>% 
+      arrange(desc(Score))
+ 
+     
+test2
+```
+
+
+```{r}
+test2
+```
+
+```{r}
+ggplot(data = test2, 
+       mapping = aes(x = Score,
+                     y = continent)) +
+  geom_col()
+  
+```
+
+
+```{r}
+test2 %>% 
+  filter(continent == "Asia")
+```
+
+```{r}
+regional_happiness <-  happiness %>%
+      select(c('year','sub_region','continent','Score','Country','code',"GDP.per.capita","Healthy.life.expectancy","Freedom.to.make.life.choices","Generosity","Perceptions.of.corruption","Social.support",'Dystopia.Residual'))
+```
+
+
+```{r}
+regional_aggregate <-  regional_happiness %>%
+      mutate(Score = rowSums(.[7:length(regional_happiness)], na.rm=TRUE))
+```
+
+```{r}
+regional_aggregate %>%
+      group_by_(~sub_region,~continent) %>%
+      summarise(Score= round( mean(Score),3)) %>%
+      arrange(desc(Score))
+
+
+regioanal_aggregate
+```
+
+
